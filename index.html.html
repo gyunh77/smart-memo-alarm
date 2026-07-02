@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Smart Memo Alarm v2</title>
+<style>
+body{margin:0;background:#0f0f0f;color:white;font-family:Arial,sans-serif}
+.wrap{display:flex;height:100vh}
+.left{flex:2;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.right{flex:1;border-left:2px solid #333;padding:18px}
+#date{font-size:28px;margin-bottom:10px}
+#clock{font-size:88px;font-weight:bold}
+textarea{width:100%;height:80%;background:#1b1b1b;color:white;border:1px solid #444;
+padding:12px;font-size:20px;resize:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="left">
+<div id="date"></div>
+<div id="clock"></div>
+</div>
+<div class="right">
+<h2>📝 메모장</h2>
+<p>예시:<br>
+오후 5시 50분 식사<br>
+17:50 식사<br>
+17:50:30 식사
+</p>
+<textarea id="memo"></textarea>
+</div>
+</div>
+
+<script>
+const memo=document.getElementById("memo");
+memo.value=localStorage.getItem("memo_v2")||"";
+memo.oninput=()=>localStorage.setItem("memo_v2",memo.value);
+
+function beep(){
+ const ctx=new (window.AudioContext||window.webkitAudioContext)();
+ const osc=ctx.createOscillator();
+ osc.frequency.value=880;
+ osc.connect(ctx.destination);
+ osc.start();
+ setTimeout(()=>osc.stop(),1000);
+}
+
+function parseLine(line){
+ line=line.trim();
+
+ let m=line.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s+(.+)$/);
+ if(m){
+   return {
+     h:+m[1], mi:+m[2], s:+(m[3]||0),
+     text:m[4]
+   };
+ }
+
+ m=line.match(/^(오전|오후)\s*(\d{1,2})시\s*(\d{1,2})분\s*(.+)$/);
+ if(m){
+   let h=+m[2];
+   if(m[1]=="오후" && h<12) h+=12;
+   if(m[1]=="오전" && h==12) h=0;
+   return {h, mi:+m[3], s:0, text:m[4]};
+ }
+
+ return null;
+}
+
+let lastTriggered="";
+
+function tick(){
+ const n=new Date();
+
+ const h24=n.getHours();
+ const m=String(n.getMinutes()).padStart(2,"0");
+ const s=String(n.getSeconds()).padStart(2,"0");
+
+ let period=h24>=12?"오후":"오전";
+ let h12=h24%12;
+ if(h12===0) h12=12;
+
+ document.getElementById("clock").textContent =
+   `${period} ${h12}:${m}:${s}`;
+
+ document.getElementById("date").textContent =
+   n.toLocaleDateString("ko-KR");
+
+ const current =
+   `${h24}:${n.getMinutes()}:${n.getSeconds()}`;
+
+ if(current===lastTriggered) return;
+
+ for(const line of memo.value.split("\n")){
+   const p=parseLine(line);
+   if(!p) continue;
+
+   if(
+      p.h===n.getHours() &&
+      p.mi===n.getMinutes() &&
+      p.s===n.getSeconds()
+   ){
+      lastTriggered=current;
+      beep();
+      alert("⏰ "+p.text);
+      break;
+   }
+ }
+}
+
+setInterval(tick,1000);
+tick();
+</script>
+</body>
+</html>
